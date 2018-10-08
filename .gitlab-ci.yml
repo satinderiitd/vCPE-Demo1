@@ -1,0 +1,49 @@
+stages:
+    - deploy
+    #- undeploy
+
+
+
+deployInCloudify:
+    except:
+      - schedules
+    stage: deploy
+    image: ubuntu
+    #only:
+    #- staging
+    #- demo
+    environment:
+       name: $CI_COMMIT_REF_NAME
+    before_script:
+    # Install cfy CLI
+    - curl -O http://repository.cloudifysource.org/cloudify/18.7.23/community-release/cloudify-cli-community-18.7.23.deb
+    - sudo dpkg -i cloudify-cli-community-18.7.23.deb
+    - sudo rm cloudify-cli-community-18.7.23.deb
+    # Prepare profile to use and uninstall old instance
+    - cfy profile use $CFY_INSTANCE -u $CFY_USER -p $CFY_PASSWORD -t $CFY_TENANT
+    # Check if environment is already deployed
+    #- export DEPLOYMENT_STATUS=`curl -sL -w "%{http_code}\\n" $CI_ENVIRONMENT_URL -o /dev/null`
+    #- echo "deployment status = " $DEPLOYMENT_STATUS
+    #- if [ $DEPLOYMENT_STATUS != 200 ]; then echo "new install"; else echo "update"; fi
+    #- cfy blueprints delete uc1-Client
+    #- cfy blueprints delete uc2-Client
+    #- if cfy blueprints list | grep -q uc2-Client && echo true || echo false; then cfy blueprints delete uc2-Client; else echo "uc2-Client not found"; fi
+    #- if cfy blueprints list | grep -q uc1-Client && echo true || echo false; then cfy blueprints delete uc1-Client; else echo "uc1-Client not found"; fi
+    - if cfy blueprints list | grep -q uc2-Client; then cfy blueprints delete uc2-Client; else echo "uc2-Client not found"; fi
+    - if cfy blueprints list | grep -q uc1-Client; then cfy blueprints delete uc1-Client; else echo "uc1-Client not found"; fi
+    script:
+    #- cfy blueprints list
+    - cfy blueprints upload -b uc1-Client openstack-uc1-client-vCPE.yaml
+    - cfy blueprints upload -b uc2-Client openstack-uc2-client-vCPE.yaml
+    - if cfy deployments list | grep -q vCPE-UI; then cfy uninstall vCPE-UI; else echo "vCPE-UI not found"; fi
+    - git clone git@git.sami.int.thomsonreuters.com:Gregory.Katsaros/tosca-service-ui-server.git
+    - cd tosca-service-ui-server
+    - cfy install -b vCPE-UI openstack-ui-server.yaml
+    - cd ../
+    - cfy deployments outputs vCPE-UI > output.txt
+    
+    dependencies: [] 
+    #artifacts:
+    #    paths:
+    #    - output.txt
+
